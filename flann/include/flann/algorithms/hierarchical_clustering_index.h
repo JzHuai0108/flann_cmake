@@ -51,7 +51,7 @@
 #include "flann/util/allocator.h"
 #include "flann/util/random.h"
 #include "flann/util/saving.h"
-// #include "flann/util/serialization.h"
+#include "flann/util/serialization.h"
 
 namespace flann
 {
