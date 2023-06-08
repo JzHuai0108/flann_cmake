@@ -46,8 +46,10 @@ struct FLANNParameters
 
     /* search time parameters */
     int checks;                /* how many leafs (features) to check in one search */
-    float cb_index;            /* cluster boundary index. Used when searching the kmeans tree */
     float eps;     /* eps parameter for eps-knn search */
+    int sorted;     /* indicates if results returned by radius search should be sorted or not */
+    int max_neighbors;  /* limits the maximum number of neighbors should be returned by radius search */
+    int cores;      /* number of paralel cores to use for searching */
 
     /*  kdtree index parameters */
     int trees;                 /* number of randomized trees to use (for kdtree) */
@@ -57,6 +59,7 @@ struct FLANNParameters
     int branching;             /* branching factor (for kmeans tree) */
     int iterations;            /* max iterations to perform in one kmeans cluetering (kmeans tree) */
     enum flann_centers_init_t centers_init;  /* algorithm used for picking the initial cluster centers for kmeans tree */
+    float cb_index;            /* cluster boundary index. Used when searching the kmeans tree */
 
     /* autotuned index parameters */
     float target_precision;    /* precision desired (used for autotuning, -1 otherwise) */
@@ -97,6 +100,16 @@ FLANN_EXPORT void flann_log_verbosity(int level);
  */
 FLANN_EXPORT void flann_set_distance_type(enum flann_distance_t distance_type, int order);
 
+/**
+ * Gets the distance type in use throughout FLANN.
+ */
+FLANN_EXPORT enum flann_distance_t flann_get_distance_type();
+
+/**
+ * Gets the distance order in use throughout FLANN (only applicable if minkowski distance
+ * is in use).
+ */
+FLANN_EXPORT int flann_get_distance_order();
 
 /**
    Builds and returns an index. It uses autotuning if the target_precision field of index_params
@@ -141,6 +154,133 @@ FLANN_EXPORT flann_index_t flann_build_index_int(int* dataset,
                                                  int cols,
                                                  float* speedup,
                                                  struct FLANNParameters* flann_params);
+
+/**
+  Adds points to pre-built index.
+
+  Params:
+    index_ptr = pointer to index, must already be built
+    points = pointer to array of points
+    rows = number of points to add
+    columns = feature dimensionality
+    rebuild_threshold = reallocs index when it grows by factor of
+      `rebuild_threshold`. A smaller value results is more space efficient
+      but less computationally efficient. Must be greater than 1.
+
+  Returns: 0 if success otherwise -1
+**/
+FLANN_EXPORT int flann_add_points(flann_index_t index_ptr, float* points,
+                                  int rows, int columns,
+                                  float rebuild_threshold);
+
+FLANN_EXPORT int flann_add_points_float(flann_index_t index_ptr, float* points,
+                                        int rows, int columns,
+                                        float rebuild_threshold);
+
+FLANN_EXPORT int flann_add_points_double(flann_index_t index_ptr,
+                                         double* points, int rows, int columns,
+                                         float rebuild_threshold);
+
+FLANN_EXPORT int flann_add_points_byte(flann_index_t index_ptr,
+                                       unsigned char* points, int rows,
+                                       int columns, float rebuild_threshold);
+
+FLANN_EXPORT int flann_add_points_int(flann_index_t index_ptr, int* points,
+                                      int rows, int columns,
+                                      float rebuild_threshold);
+
+/**
+ * Removes a point from a pre-built index.
+ *
+ * index_ptr = pointer to pre-built index.
+ * point_id = index of datapoint to remove.
+*/
+FLANN_EXPORT int flann_remove_point(flann_index_t index_ptr,
+                                    unsigned int point_id);
+
+FLANN_EXPORT int flann_remove_point_float(flann_index_t index_ptr,
+                                          unsigned int point_id);
+
+FLANN_EXPORT int flann_remove_point_double(flann_index_t index_ptr,
+                                           unsigned int point_id);
+
+FLANN_EXPORT int flann_remove_point_byte(flann_index_t index_ptr,
+                                         unsigned int point_id);
+
+FLANN_EXPORT int flann_remove_point_int(flann_index_t index_ptr,
+                                        unsigned int point_id);
+
+/**
+ * Gets a point from a given index position.
+ *
+ * index_ptr = pointer to pre-built index.
+ * point_id = index of datapoint to get.
+ *
+ * Returns: pointer to datapoint or NULL on miss
+*/
+FLANN_EXPORT float* flann_get_point(flann_index_t index_ptr,
+                                    unsigned int point_id);
+
+FLANN_EXPORT float* flann_get_point_float(flann_index_t index_ptr,
+                                          unsigned int point_id);
+
+FLANN_EXPORT double* flann_get_point_double(flann_index_t index_ptr,
+                                            unsigned int point_id);
+
+FLANN_EXPORT unsigned char* flann_get_point_byte(flann_index_t index_ptr,
+                                                 unsigned int point_id);
+
+FLANN_EXPORT int* flann_get_point_int(flann_index_t index_ptr,
+                                      unsigned int point_id);
+
+/**
+ * Returns the number of datapoints stored in index.
+ *
+ * index_ptr = pointer to pre-built index.
+ *
+*/
+FLANN_EXPORT unsigned int flann_veclen(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_veclen_float(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_veclen_double(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_veclen_byte(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_veclen_int(flann_index_t index_ptr);
+
+/**
+ * Returns the dimensionality of datapoints stored in index.
+ *
+ * index_ptr = pointer to pre-built index.
+ *
+*/
+FLANN_EXPORT unsigned int flann_size(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_size_float(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_size_double(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_size_byte(flann_index_t index_ptr);
+
+FLANN_EXPORT unsigned int flann_size_int(flann_index_t index_ptr);
+
+/**
+ * Returns the number of bytes consumed by the index.
+ *
+ * index_ptr = pointer to pre-built index.
+ *
+*/
+FLANN_EXPORT int flann_used_memory(flann_index_t index_ptr);
+
+FLANN_EXPORT int flann_used_memory_float(flann_index_t index_ptr);
+
+FLANN_EXPORT int flann_used_memory_double(flann_index_t index_ptr);
+
+FLANN_EXPORT int flann_used_memory_byte(flann_index_t index_ptr);
+
+FLANN_EXPORT int flann_used_memory_int(flann_index_t index_ptr);
+
 
 /**
  * Saves the index to a file. Only the index is saved into the file, the dataset corresponding to the index is not saved.
@@ -336,11 +476,6 @@ FLANN_EXPORT int flann_find_nearest_neighbors_index_int(flann_index_t index_id,
  * (the same way as for the KNN search). A lower value for checks will give
  * a higher search speedup at the cost of potentially not returning all the
  * neighbours in the specified radius.
- *
- * The cores parameter in the FLANNParameters below sets the number of cores
- * that will be used for the radius search, in case Intel TBB is present on
- * the system and FLANN is built with multicore support on. Auto core selection
- * can be achieved by setting the number of cores to -1.
  */
 FLANN_EXPORT int flann_radius_search(flann_index_t index_ptr, /* the index */
                                      float* query, /* query point */

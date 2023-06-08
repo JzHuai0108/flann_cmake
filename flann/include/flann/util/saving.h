@@ -34,13 +34,13 @@
 #include <stdio.h>
 
 #include "flann/general.h"
-#include "flann/algorithms/nn_index.h"
+#include "flann/util/serialization.h"
 
 
 #ifdef FLANN_SIGNATURE_
 #undef FLANN_SIGNATURE_
 #endif
-#define FLANN_SIGNATURE_ "FLANN_INDEX"
+#define FLANN_SIGNATURE_ "FLANN_INDEX_v1.1"
 
 namespace flann
 {
@@ -50,12 +50,33 @@ namespace flann
  */
 struct IndexHeader
 {
-    char signature[16];
-    char version[16];
-    flann_datatype_t data_type;
-    flann_algorithm_t index_type;
-    size_t rows;
-    size_t cols;
+    IndexHeaderStruct h;
+
+    IndexHeader()
+	{
+        memset(h.signature, 0, sizeof(h.signature));
+        strcpy(h.signature, FLANN_SIGNATURE_);
+        memset(h.version, 0, sizeof(h.version));
+        strcpy(h.version, FLANN_VERSION_);
+
+        h.compression = 0;
+        h.first_block_size = 0;
+	}
+
+private:
+    template<typename Archive>
+    void serialize(Archive& ar)
+    {
+        ar & h.signature;
+        ar & h.version;
+        ar & h.data_type;
+        ar & h.index_type;
+        ar & h.rows;
+        ar & h.cols;
+        ar & h.compression;
+        ar & h.first_block_size;
+    }
+    friend struct serialization::access;
 };
 
 /**
@@ -64,18 +85,14 @@ struct IndexHeader
  * @param stream - Stream to save to
  * @param index - The index to save
  */
-template<typename Distance>
-void save_header(FILE* stream, const NNIndex<Distance>& index)
+template<typename Index>
+void save_header(FILE* stream, const Index& index)
 {
     IndexHeader header;
-    memset(header.signature, 0, sizeof(header.signature));
-    strcpy(header.signature, FLANN_SIGNATURE_);
-    memset(header.version, 0, sizeof(header.version));
-    strcpy(header.version, FLANN_VERSION_);
-    header.data_type = flann_datatype<typename Distance::ElementType>::value;
-    header.index_type = index.getType();
-    header.rows = index.size();
-    header.cols = index.veclen();
+    header.h.data_type = flann_datatype_value<typename Index::ElementType>::value;
+    header.h.index_type = index.getType();
+    header.h.rows = index.size();
+    header.h.cols = index.veclen();
 
     fwrite(&header, sizeof(header),1,stream);
 }
@@ -91,11 +108,13 @@ inline IndexHeader load_header(FILE* stream)
     IndexHeader header;
     int read_size = fread(&header,sizeof(header),1,stream);
 
-    if (read_size!=1) {
+    if (read_size != 1) {
         throw FLANNException("Invalid index file, cannot read");
     }
 
-    if (strcmp(header.signature,FLANN_SIGNATURE_)!=0) {
+    if (strncmp(header.h.signature,
+                FLANN_SIGNATURE_,
+                strlen(FLANN_SIGNATURE_) - strlen("v0.0")) != 0) {
         throw FLANNException("Invalid index file, wrong signature");
     }
 
@@ -103,64 +122,12 @@ inline IndexHeader load_header(FILE* stream)
 }
 
 
-template<typename T>
-void save_value(FILE* stream, const T& value, size_t count = 1)
+namespace serialization
 {
-    fwrite(&value, sizeof(value),count, stream);
-}
-
-template<typename T>
-void save_value(FILE* stream, const flann::Matrix<T>& value)
-{
-    fwrite(&value, sizeof(value),1, stream);
-    fwrite(value.ptr(), sizeof(T),value.rows*value.cols, stream);
-}
-
-template<typename T>
-void save_value(FILE* stream, const std::vector<T>& value)
-{
-    size_t size = value.size();
-    fwrite(&size, sizeof(size_t), 1, stream);
-    fwrite(&value[0], sizeof(T), size, stream);
-}
-
-template<typename T>
-void load_value(FILE* stream, T& value, size_t count = 1)
-{
-    size_t read_cnt = fread(&value, sizeof(value), count, stream);
-    if (read_cnt != count) {
-        throw FLANNException("Cannot read from file");
-    }
-}
-
-template<typename T>
-void load_value(FILE* stream, flann::Matrix<T>& value)
-{
-    size_t read_cnt = fread(&value, sizeof(value), 1, stream);
-    if (read_cnt != 1) {
-        throw FLANNException("Cannot read from file");
-    }
-    value = Matrix<T>(new T[value.rows*value.cols], value.rows, value.cols);
-    read_cnt = fread(value.ptr(), sizeof(T), value.rows*value.cols, stream);
-    if (read_cnt != value.rows*value.cols) {
-        throw FLANNException("Cannot read from file");
-    }
-}
-
-
-template<typename T>
-void load_value(FILE* stream, std::vector<T>& value)
-{
-    size_t size;
-    size_t read_cnt = fread(&size, sizeof(size_t), 1, stream);
-    if (read_cnt!=1) {
-        throw FLANNException("Cannot read from file");
-    }
-    value.resize(size);
-    read_cnt = fread(&value[0], sizeof(T), size, stream);
-    if (int(read_cnt)!=int(size)) {
-        throw FLANNException("Cannot read from file");
-    }
+ENUM_SERIALIZER(flann_algorithm_t);
+ENUM_SERIALIZER(flann_centers_init_t);
+ENUM_SERIALIZER(flann_log_level_t);
+ENUM_SERIALIZER(flann_datatype_t);
 }
 
 }
